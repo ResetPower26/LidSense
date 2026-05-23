@@ -38,9 +38,19 @@ jobs:
             -derivedDataPath "$DERIVED_DATA_PATH" \
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES
+
+      - name: Verify ad-hoc signature
+        run: |
+          set -euo pipefail
+
+          APP_PATH="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/$APP_NAME.app"
+          test -d "$APP_PATH"
+          codesign -dv "$APP_PATH" 2>&1 | tee /tmp/codesign.txt
+          grep -q "Signature=adhoc" /tmp/codesign.txt
 
       - name: Create DMG
         run: |
