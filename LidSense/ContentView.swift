@@ -6,7 +6,26 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var reader = LidAngleReader()
+    @ObservedObject var reader: LidAngleReader
+
+    var body: some View {
+        TabView {
+            LidAngleView(reader: reader)
+                .tabItem {
+                    Text("Lid Angle")
+                }
+
+            SettingsView()
+                .tabItem {
+                    Text("Settings")
+                }
+        }
+        .frame(minWidth: 360, minHeight: 240)
+    }
+}
+
+private struct LidAngleView: View {
+    @ObservedObject var reader: LidAngleReader
 
     var body: some View {
         VStack(spacing: 18) {
@@ -45,7 +64,24 @@ struct ContentView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(minWidth: 360, minHeight: 260)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(32)
+    }
+}
+
+private struct SettingsView: View {
+    @AppStorage("showInMenuBar") private var showInMenuBar = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Settings")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Toggle("Show in Menu Bar", isOn: $showInMenuBar)
+                .toggleStyle(.switch)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(32)
     }
 }

@@ -2,7 +2,7 @@
 
 LidSense is a small native macOS app that reads and displays the current MacBook lid angle.
 
-The app is intended as a personal experiment and hardware exploration tool. It uses an undocumented HID feature report exposed by some Apple hardware, so it should not be treated as a stable system API.
+LidSense reads an undocumented HID feature report exposed by some Apple hardware, so its behavior should not be treated as a stable macOS API.
 
 ## Requirements
 

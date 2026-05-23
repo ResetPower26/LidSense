@@ -1,0 +1,91 @@
+name: Build DMG
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Apple Silicon DMG
+    runs-on: macos-26
+
+    env:
+      APP_NAME: LidSense
+      PROJECT: LidSense.xcodeproj
+      SCHEME: LidSense
+      CONFIGURATION: Release
+      DERIVED_DATA_PATH: ${{ github.workspace }}/DerivedData
+      DIST_DIR: ${{ github.workspace }}/dist
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build app
+        run: |
+          xcodebuild clean build \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -destination "generic/platform=macOS" \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Create DMG
+        run: |
+          set -euo pipefail
+
+          APP_PATH="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/$APP_NAME.app"
+          TAG_NAME="${GITHUB_REF_NAME}"
+          DMG_NAME="$APP_NAME-$TAG_NAME-arm64"
+          DMG_ROOT="$DIST_DIR/dmg-root"
+
+          test -d "$APP_PATH"
+
+          rm -rf "$DIST_DIR"
+          mkdir -p "$DMG_ROOT"
+          ditto "$APP_PATH" "$DMG_ROOT/$APP_NAME.app"
+          ln -s /Applications "$DMG_ROOT/Applications"
+
+          hdiutil create \
+            -volname "$APP_NAME" \
+            -srcfolder "$DMG_ROOT" \
+            -ov \
+            -format UDZO \
+            "$DIST_DIR/$DMG_NAME.dmg"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LidSense-${{ github.ref_name }}-arm64-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+
+      - name: Attach DMG to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          DMG_FILE="$(find "$DIST_DIR" -maxdepth 1 -name "*.dmg" -print -quit)"
+          test -n "$DMG_FILE"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$DMG_FILE" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$DMG_FILE" \
+              --draft \
+              --generate-notes \
+              --title "$GITHUB_REF_NAME"
+          fi

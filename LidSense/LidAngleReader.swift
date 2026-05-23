@@ -9,7 +9,7 @@ import IOKit.hid
 
 final class LidAngleReader: ObservableObject {
     @Published var angle: Int?
-    @Published var status = "Looking for lid angle sensor..."
+    @Published var status = Status.looking
 
     private enum HID {
         static let vendorID = 0x05AC
@@ -18,6 +18,13 @@ final class LidAngleReader: ObservableObject {
         static let primaryUsage = 0x008A
         static let featureReportID = CFIndex(1)
         static let reportLength = 3
+    }
+
+    private enum Status {
+        static let looking = "Looking for lid angle sensor..."
+        static let reading = "Reading lid angle..."
+        static let unavailable = "Lid angle sensor is unavailable on this Mac."
+        static let readFailed = "Could not read lid angle."
     }
 
     private var manager: IOHIDManager?
@@ -58,24 +65,24 @@ final class LidAngleReader: ObservableObject {
 
         let managerResult = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         guard managerResult == kIOReturnSuccess else {
-            setUnavailable("Could not open HID manager: \(hex(managerResult)).")
+            setUnavailable(Status.unavailable)
             return
         }
 
         guard let devices = IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice>,
               let device = devices.first else {
-            setUnavailable("Lid angle sensor was not found on this Mac.")
+            setUnavailable(Status.unavailable)
             return
         }
 
         let openResult = IOHIDDeviceOpen(device, IOOptionBits(kIOHIDOptionsTypeNone))
         guard openResult == kIOReturnSuccess else {
-            setUnavailable("Could not open lid angle sensor: \(hex(openResult)).")
+            setUnavailable(Status.unavailable)
             return
         }
 
         self.device = device
-        status = "Reading lid angle..."
+        status = Status.reading
         readAngle()
         startPolling()
     }
@@ -89,7 +96,7 @@ final class LidAngleReader: ObservableObject {
 
     private func readAngle() {
         guard let device else {
-            setUnavailable("Lid angle sensor is unavailable.")
+            setUnavailable(Status.unavailable)
             return
         }
 
@@ -111,17 +118,17 @@ final class LidAngleReader: ObservableObject {
         }
 
         guard result == kIOReturnSuccess else {
-            setUnavailable("Could not read lid angle: \(hex(result)).")
+            setUnavailable(Status.readFailed)
             return
         }
 
         guard reportLength >= HID.reportLength else {
-            setUnavailable("Lid angle sensor returned an invalid report.")
+            setUnavailable(Status.readFailed)
             return
         }
 
         angle = Int(report[1]) | (Int(report[2]) << 8)
-        status = "Reading lid angle..."
+        status = Status.reading
     }
 
     private func setUnavailable(_ message: String) {
@@ -129,7 +136,4 @@ final class LidAngleReader: ObservableObject {
         status = message
     }
 
-    private func hex(_ value: IOReturn) -> String {
-        "0x" + String(UInt32(bitPattern: value), radix: 16, uppercase: true)
-    }
 }
